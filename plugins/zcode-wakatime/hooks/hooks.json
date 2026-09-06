@@ -1,0 +1,53 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${ZCODE_PLUGIN_ROOT}/bin/zcode-wakatime.js\" --background",
+            "timeoutMs": 10000,
+            "statusMessage": "WakaTime"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${ZCODE_PLUGIN_ROOT}/bin/zcode-wakatime.js\" --background",
+            "timeoutMs": 10000,
+            "statusMessage": "WakaTime"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${ZCODE_PLUGIN_ROOT}/bin/zcode-wakatime.js\" --background",
+            "timeoutMs": 10000,
+            "statusMessage": "WakaTime"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${ZCODE_PLUGIN_ROOT}/bin/zcode-wakatime.js\" --background",
+            "timeoutMs": 10000,
+            "statusMessage": "WakaTime"
+          }
+        ]
+      }
+    ]
+  }
+}

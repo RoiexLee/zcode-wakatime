@@ -1,0 +1,19 @@
+{
+  "name": "zcode-wakatime",
+  "version": "0.1.0",
+  "description": "WakaTime plugin for ZCode: automatic time tracking for AI coding sessions.",
+  "description_i18n": {
+    "en": "WakaTime plugin for ZCode: automatic time tracking for AI coding sessions.",
+    "zh-CN": "ZCode 的 WakaTime 插件：自动统计 AI 编程会话时长。"
+  },
+  "author": {
+    "name": "RoiexLee",
+    "url": "https://github.com/RoiexLee"
+  },
+  "keywords": [
+    "zcode",
+    "wakatime",
+    "time-tracking",
+    "ai"
+  ]
+}

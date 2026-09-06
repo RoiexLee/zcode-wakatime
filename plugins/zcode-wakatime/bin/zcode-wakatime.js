@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+// zcode-wakatime — WakaTime plugin for ZCode.
+//
+// Derived from wakatime/codex-cli-wakatime (BSD-3-Clause, Copyright (c) 2026 WakaTime):
+// the wakatime-cli installer, proxy and zip machinery below is retained from upstream.
+// The heartbeat core is adapted for ZCode: classic `--entity` heartbeats with
+// tolerant hook-payload parsing, because upstream's `--sync-ai-heartbeats`
+// transcript parsing does not know ZCode session logs yet.
 
 const childProcess = require('child_process');
 const fs = require('fs');
@@ -10,8 +17,10 @@ const path = require('path');
 const tls = require('tls');
 const zlib = require('zlib');
 
-const VERSION = '1.0.0';
-const PLUGIN_NAME = 'codex-cli-wakatime';
+const VERSION = '0.1.0';
+const PLUGIN_NAME = 'zcode-wakatime';
+const CATEGORY = 'ai coding';
+const THROTTLE_MS = 60_000;
 const GITHUB_DOWNLOAD_URL = 'https://github.com/wakatime/wakatime-cli/releases/latest/download';
 const GITHUB_RELEASES_URL = 'https://api.github.com/repos/wakatime/wakatime-cli/releases/latest';
 
@@ -43,8 +52,12 @@ async function main() {
   if (!shouldSyncHeartbeat(input, eventName)) return;
 
   const cliPath = await ensureWakatimeCli({ checkLatest: false });
-  await syncAiHeartbeats(cliPath, input);
+  await sendHeartbeats(cliPath, input);
 }
+
+// ---------------------------------------------------------------------------
+// Hook plumbing (two-stage: the hook must return immediately, so stdin is
+// persisted to a temp file and processed by a detached child process).
 
 function launchBackground() {
   try {
@@ -93,21 +106,23 @@ function normalizeInput(input) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Event policy
+
 function shouldSyncHeartbeat(input, eventName) {
-  if (eventName === 'userPromptSubmitted') return true;
+  if (eventName === 'userPromptSubmit') return true;
+  if (eventName === 'stop') return true;
   if (eventName === 'postToolUse') return isFileEditTool(input);
   return false;
 }
 
 function normalizeEventName(eventName) {
-  const names = {
-    PostToolUse: 'postToolUse',
-    SessionStart: 'sessionStart',
-    session_started: 'sessionStart',
-    UserPromptSubmit: 'userPromptSubmitted',
-    userPromptSubmit: 'userPromptSubmitted',
-  };
-  return names[eventName] || eventName;
+  const n = String(eventName || '').toLowerCase().replace(/_/g, '');
+  if (n === 'stop') return 'stop';
+  if (n === 'sessionstart') return 'sessionStart';
+  if (n === 'posttooluse') return 'postToolUse';
+  if (n === 'userpromptsubmit' || n === 'userpromptsubmitted') return 'userPromptSubmit';
+  return '';
 }
 
 function isFileEditTool(input) {
@@ -126,17 +141,84 @@ function getNestedToolName(input) {
   return '';
 }
 
-async function syncAiHeartbeats(cliPath, input) {
-  const normalized = normalizeInput(input);
-  const codexVersion = await getCodexVersion();
-  const plugin = `codex-cli/${codexVersion || 'unknown'} ${PLUGIN_NAME}/${VERSION}`;
-  const args = ['--sync-ai-heartbeats', '--plugin', plugin];
+// ---------------------------------------------------------------------------
+// Heartbeats (route B: classic --entity heartbeats with rate limiting)
 
+function pick(obj, keys) {
+  for (const k of keys) {
+    if (obj && typeof obj === 'object' && obj[k] != null && obj[k] !== '') return obj[k];
+  }
+  return undefined;
+}
+
+function looksLikePath(value) {
+  return typeof value === 'string' && (/^[a-zA-Z]:[\\/]/.test(value) || value.startsWith('/'));
+}
+
+function extractFilePath(input) {
+  const containers = [input, input.tool_input, input.toolInput, input.input, input.tool, input.tool_call];
+  for (const c of containers) {
+    const v = pick(c, ['file_path', 'filePath', 'absolute_path', 'notebook_path', 'path']);
+    if (looksLikePath(v)) return v;
+  }
+  return undefined;
+}
+
+function throttleGate(key) {
+  const state = loadState();
+  const now = Date.now();
+  if (typeof state[key] === 'number' && now - state[key] < THROTTLE_MS) return true;
+  state[key] = now;
+  saveState(state);
+  return false;
+}
+
+function loadState() {
+  try {
+    return JSON.parse(fs.readFileSync(getStateFile(), 'utf8'));
+  } catch (_) {
+    return {};
+  }
+}
+
+function saveState(state) {
+  try {
+    fs.mkdirSync(path.dirname(getStateFile()), { recursive: true });
+    fs.writeFileSync(getStateFile(), JSON.stringify(state));
+  } catch (_) {}
+}
+
+function getStateFile() {
+  return path.join(getWakatimeDir(), 'zcode-cli', 'state.json');
+}
+
+async function sendHeartbeats(cliPath, input) {
+  const normalized = normalizeInput(input);
+  const eventName = normalizeEventName(normalized.eventName);
+  const plugin = `${PLUGIN_NAME}/${VERSION}`;
+
+  let entity;
+  if (eventName === 'postToolUse') {
+    entity = extractFilePath(input);
+    if (!entity) {
+      log('DEBUG', 'edit tool without recognizable file path — skipped');
+      return;
+    }
+  } else {
+    // userPromptSubmit / stop: attribute activity to the project working directory.
+    entity = normalized.cwd;
+    if (throttleGate(`dir:${entity}`)) {
+      log('DEBUG', `throttled directory heartbeat for ${entity}`);
+      return;
+    }
+  }
+
+  const args = ['--entity', entity, '--category', CATEGORY, '--plugin', plugin];
   if (normalized.cwd) {
     args.push('--project-folder', normalized.cwd);
   }
 
-  log('DEBUG', `Syncing AI heartbeats: ${formatArguments(cliPath, args)}`);
+  log('DEBUG', `Sending heartbeat: ${formatArguments(cliPath, args)}`);
 
   try {
     const result = await execFile(cliPath, args, {
@@ -151,19 +233,8 @@ async function syncAiHeartbeats(cliPath, input) {
   }
 }
 
-async function getCodexVersion() {
-  const envVersion = process.env.CODEX_CLI_BINARY_VERSION || process.env.CODEX_CLI_VERSION || process.env.CODEX_VERSION;
-  if (envVersion) return envVersion;
-
-  try {
-    const result = await execFile('codex', ['--version'], { windowsHide: true, timeout: 2000 });
-    const output = `${result.stdout || ''}${result.stderr || ''}`;
-    const match = output.match(/(\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?)/);
-    return match ? match[1] : '';
-  } catch (_) {
-    return '';
-  }
-}
+// ---------------------------------------------------------------------------
+// wakatime-cli installer (retained from upstream)
 
 async function ensureWakatimeCli(options = {}) {
   const checkLatest = options.checkLatest === true;
@@ -337,7 +408,7 @@ function cliDownloadUrl() {
 function reportMissingPlatformSupport() {
   const url = `https://api.wakatime.com/api/v1/cli-missing?osname=${encodeURIComponent(osName())}&architecture=${encodeURIComponent(
     architecture(),
-  )}&plugin=codex-cli`;
+  )}&plugin=zcode-wakatime`;
   requestWithRedirects(url)
     .then((response) => response.resume())
     .catch(() => {});
@@ -362,6 +433,9 @@ function osName() {
 function isWindows() {
   return os.platform() === 'win32';
 }
+
+// ---------------------------------------------------------------------------
+// HTTP helpers (retained from upstream, incl. proxy support)
 
 async function downloadToFile(url, outputFile) {
   const response = await requestWithRedirects(url);
@@ -413,7 +487,7 @@ async function sendRequest(url) {
   const noSSLVerify = getSetting('settings', 'no_ssl_verify') === 'true';
   const rejectUnauthorized = !noSSLVerify;
   const headers = {
-    'User-Agent': 'github.com/wakatime/codex-cli-wakatime',
+    'User-Agent': 'github.com/RoiexLee/zcode-wakatime',
   };
 
   return new Promise(async (resolve, reject) => {
@@ -534,6 +608,9 @@ function getProxyAuthorizationHeader(proxyUrl) {
   return `Basic ${Buffer.from(`${decodeURIComponent(proxyUrl.username)}:${decodeURIComponent(proxyUrl.password)}`).toString('base64')}`;
 }
 
+// ---------------------------------------------------------------------------
+// Zip extraction (retained from upstream)
+
 function extractZip(zipFile, outputDir) {
   const buffer = fs.readFileSync(zipFile);
   const eocdOffset = findEndOfCentralDirectory(buffer);
@@ -600,6 +677,9 @@ function safeJoin(root, fileName) {
   return target;
 }
 
+// ---------------------------------------------------------------------------
+// Settings and environment
+
 function getSetting(section, key) {
   try {
     const content = fs.readFileSync(getConfigFile(), 'utf8');
@@ -634,12 +714,12 @@ function getWakatimeDir() {
 
 function getPluginTempDir() {
   const fromEnv =
-    cleanEnvPath(process.env.CODEX_PLUGIN_DATA) ||
+    cleanEnvPath(process.env.ZCODE_PLUGIN_DATA) ||
     cleanEnvPath(process.env.PLUGIN_DATA) ||
-    cleanEnvPath(process.env.COPILOT_PLUGIN_DATA) ||
+    cleanEnvPath(process.env.CODEX_PLUGIN_DATA) ||
     cleanEnvPath(process.env.CLAUDE_PLUGIN_DATA);
   if (fromEnv) return fromEnv;
-  return path.join(getWakatimeDir(), 'codex-cli', 'tmp');
+  return path.join(getWakatimeDir(), 'zcode-cli', 'tmp');
 }
 
 function getHomeDirectory() {
@@ -660,10 +740,13 @@ function getChildEnv() {
   return { ...process.env, WAKATIME_HOME: getHomeDirectory() };
 }
 
+// ---------------------------------------------------------------------------
+// Logging and misc
+
 function log(level, message) {
   if (level === 'DEBUG' && getSetting('settings', 'debug') !== 'true') return;
   try {
-    const logFile = path.join(getWakatimeDir(), 'codex-cli.log');
+    const logFile = path.join(getWakatimeDir(), 'zcode-cli.log');
     fs.mkdirSync(path.dirname(logFile), { recursive: true });
     fs.appendFileSync(logFile, `[${new Date().toISOString()}][${level}] ${message}\n`);
   } catch (_) {}
@@ -709,8 +792,8 @@ function compareVersions(left, right) {
     .map((part) => Number.parseInt(part, 10) || 0);
   const length = Math.max(leftParts.length, rightParts.length);
   for (let i = 0; i < length; i++) {
-    if ((leftParts[i] || 0) < (rightParts[i] || 0)) return -1;
-    if ((leftParts[i] || 0) > (rightParts[i] || 0)) return 1;
+    if ((leftParts[i] || 0) < rightParts[i]) return -1;
+    if ((leftParts[i] || 0) > rightParts[i]) return 1;
   }
   return 0;
 }
