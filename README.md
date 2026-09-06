@@ -25,7 +25,7 @@ Logs are written to `~/.wakatime/zcode.log`.
 
 ## License
 
-[BSD-3-Clause](plugins/zcode-wakatime/LICENSE)
+[BSD-3-Clause](LICENSE)
 
 [wakatime]: https://wakatime.com
 [zcode]: https://zcode.z.ai
