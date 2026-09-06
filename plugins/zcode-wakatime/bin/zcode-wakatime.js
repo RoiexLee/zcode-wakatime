@@ -17,7 +17,7 @@ const path = require('path');
 const tls = require('tls');
 const zlib = require('zlib');
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 const PLUGIN_NAME = 'zcode-wakatime';
 const CATEGORY = 'ai coding';
 const THROTTLE_MS = 60_000;
@@ -189,7 +189,7 @@ function saveState(state) {
 }
 
 function getStateFile() {
-  return path.join(getWakatimeDir(), 'zcode-cli', 'state.json');
+  return path.join(getWakatimeDir(), 'zcode', 'state.json');
 }
 
 async function sendHeartbeats(cliPath, input) {
@@ -719,7 +719,7 @@ function getPluginTempDir() {
     cleanEnvPath(process.env.CODEX_PLUGIN_DATA) ||
     cleanEnvPath(process.env.CLAUDE_PLUGIN_DATA);
   if (fromEnv) return fromEnv;
-  return path.join(getWakatimeDir(), 'zcode-cli', 'tmp');
+  return path.join(getWakatimeDir(), 'zcode', 'tmp');
 }
 
 function getHomeDirectory() {
@@ -746,7 +746,7 @@ function getChildEnv() {
 function log(level, message) {
   if (level === 'DEBUG' && getSetting('settings', 'debug') !== 'true') return;
   try {
-    const logFile = path.join(getWakatimeDir(), 'zcode-cli.log');
+    const logFile = path.join(getWakatimeDir(), 'zcode.log');
     fs.mkdirSync(path.dirname(logFile), { recursive: true });
     fs.appendFileSync(logFile, `[${new Date().toISOString()}][${level}] ${message}\n`);
   } catch (_) {}

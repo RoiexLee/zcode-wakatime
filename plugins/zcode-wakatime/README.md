@@ -16,7 +16,7 @@ Useful settings:
 
 ```ini
 [settings]
-debug = true                  ; verbose plugin logging to ~/.wakatime/zcode-cli.log
+debug = true                  ; verbose plugin logging to ~/.wakatime/zcode.log
 proxy = https://127.0.0.1:8080 ; optional, used for wakatime-cli downloads
 ```
 

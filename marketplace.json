@@ -18,7 +18,7 @@
         "en": "WakaTime plugin for ZCode. Installs wakatime-cli, then records AI coding heartbeats on session start, user prompts, file edits and session end.",
         "zh-CN": "ZCode 的 WakaTime 插件：自动安装 wakatime-cli，并在会话启动、用户提交、文件编辑与会话结束时记录 AI 编程心跳。"
       },
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "RoiexLee",
         "url": "https://github.com/RoiexLee"
