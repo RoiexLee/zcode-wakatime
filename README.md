@@ -2,8 +2,6 @@
 
 [WakaTime][wakatime] plugin for [ZCode][zcode] — automatic, per-project time tracking for AI coding sessions.
 
-> Derived from [wakatime/codex-cli-wakatime][upstream] (BSD-3-Clause): the wakatime-cli installer is retained from upstream; the heartbeat core is adapted for ZCode.
-
 ## How it works
 
 The plugin registers ZCode lifecycle hooks:
@@ -38,7 +36,9 @@ The plugin reads standard WakaTime settings from `~/.wakatime.cfg`, including `p
 
 ## License
 
-[BSD-3-Clause](plugins/zcode-wakatime/LICENSE) — original code Copyright (c) 2026 WakaTime; port modifications by RoiexLee.
+[BSD-3-Clause](plugins/zcode-wakatime/LICENSE) — Copyright (c) 2026 WakaTime.
+
+Ported from [wakatime/codex-cli-wakatime][upstream]: the wakatime-cli installer is retained from upstream, and the heartbeat core is adapted for ZCode.
 
 [wakatime]: https://wakatime.com
 [zcode]: https://zcode.z.ai

@@ -1,6 +1,6 @@
 {
   "name": "zcode-wakatime",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "WakaTime plugin for ZCode: automatic time tracking for AI coding sessions.",
   "description_i18n": {
     "en": "WakaTime plugin for ZCode: automatic time tracking for AI coding sessions.",

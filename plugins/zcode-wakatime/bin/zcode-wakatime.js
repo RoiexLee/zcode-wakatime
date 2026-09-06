@@ -17,7 +17,7 @@ const path = require('path');
 const tls = require('tls');
 const zlib = require('zlib');
 
-const VERSION = '0.1.1';
+const VERSION = '0.1.2';
 const PLUGIN_NAME = 'zcode-wakatime';
 const CATEGORY = 'ai coding';
 const THROTTLE_MS = 60_000;
