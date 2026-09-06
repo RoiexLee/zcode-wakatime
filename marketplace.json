@@ -1,12 +1,18 @@
 {
   "name": "zcode-wakatime",
+  "description": "WakaTime plugins and integrations for ZCode.",
+  "description_i18n": {
+    "en": "WakaTime plugins and integrations for ZCode.",
+    "zh-CN": "ZCode 的 WakaTime 插件与集成。"
+  },
+  "owner": {
+    "name": "RoiexLee",
+    "url": "https://github.com/RoiexLee"
+  },
   "plugins": [
     {
       "name": "zcode-wakatime",
-      "source": {
-        "source": "local",
-        "path": "./plugins/zcode-wakatime"
-      },
+      "source": "./plugins/zcode-wakatime",
       "description": "WakaTime plugin for ZCode. Installs wakatime-cli, then records AI coding heartbeats on session start, user prompts, file edits and session end.",
       "description_i18n": {
         "en": "WakaTime plugin for ZCode. Installs wakatime-cli, then records AI coding heartbeats on session start, user prompts, file edits and session end.",
